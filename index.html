@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Entregas y cuadre de caja</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
+<style type="text/tailwindcss">
+  body { font-family: 'Figtree', system-ui, sans-serif; }
+  @layer components {
+    .inp { @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-slate-900; }
+    .lbl { @apply block text-sm font-semibold text-slate-600 mb-1 mt-4; }
+    .btn { @apply w-full rounded-xl bg-slate-900 py-3.5 text-base font-bold text-white active:scale-[.98] disabled:opacity-50; }
+    .card { @apply rounded-2xl bg-white p-4 shadow-sm; }
+  }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+<div id="toast" class="fixed inset-x-3 top-3 z-50 hidden rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-lg"></div>
+
+<!-- INICIO -->
+<section id="vLogin" class="mx-auto max-w-md p-6 pt-20">
+  <h1 class="text-3xl font-extrabold">Entregas del día</h1>
+  <p class="mt-1 text-slate-500">Elige tu nombre e ingresa tu PIN.</p>
+  <label class="lbl" for="selAux">Auxiliar</label>
+  <select id="selAux" class="inp"><option>Cargando…</option></select>
+  <label class="lbl" for="pin">PIN</label>
+  <input id="pin" type="password" inputmode="numeric" autocomplete="off" class="inp" placeholder="••••">
+  <button id="btnLogin" class="btn mt-6">Entrar</button>
+</section>
+
+<!-- APP -->
+<section id="vApp" class="mx-auto hidden max-w-md">
+  <header class="sticky top-0 z-20 flex items-center justify-between bg-slate-900 px-4 pb-3 text-white" style="padding-top:calc(.75rem + env(safe-area-inset-top,0px))">
+    <div>
+      <p id="hAux" class="font-extrabold"></p>
+      <input id="fecha" type="date" class="mt-0.5 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200">
+    </div>
+    <button id="btnSalir" class="text-sm underline">Salir</button>
+  </header>
+
+  <main class="p-4 pb-28">
+    <!-- Registrar -->
+    <div id="tab-registrar">
+      <label class="lbl !mt-0" for="cliente">Cliente</label>
+      <input id="cliente" class="inp" autocomplete="off" placeholder="Nombre del cliente">
+      <label class="lbl" for="detalle">Descripción del pedido</label>
+      <textarea id="detalle" rows="2" class="inp" placeholder="Qué se entregó"></textarea>
+      <label class="lbl" for="valor">Valor (COP)</label>
+      <input id="valor" type="number" inputmode="numeric" min="0" class="inp" placeholder="0">
+      <span class="lbl">Medio de pago</span>
+      <div id="medios" class="grid grid-cols-2 gap-2"></div>
+      <span class="lbl">Foto de la entrega</span>
+      <label class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white py-4 font-semibold text-slate-600">
+        <span id="fotoTxt">Tomar foto</span>
+        <input id="foto" type="file" accept="image/*" capture="environment" class="hidden">
+      </label>
+      <img id="fotoPrev" class="mt-2 hidden max-h-48 w-full rounded-xl object-cover" alt="Vista previa">
+      <label class="lbl" for="novedad">Novedades</label>
+      <textarea id="novedad" rows="2" class="inp" placeholder="Opcional"></textarea>
+      <span class="lbl">Estado</span>
+      <div id="estados" class="grid grid-cols-2 gap-2"></div>
+      <button id="btnGuardar" class="btn mt-6">Guardar pedido</button>
+    </div>
+
+    <!-- Hoy -->
+    <div id="tab-hoy" class="hidden space-y-3"></div>
+
+    <!-- Cierre -->
+    <div id="tab-cierre" class="hidden"></div>
+  </main>
+
+  <nav class="fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-md border-t border-slate-200 bg-white" style="padding-bottom:env(safe-area-inset-bottom,0px)">
+    <button data-tab="registrar" class="tabbtn flex-1 py-3.5 text-sm font-bold">Registrar</button>
+    <button data-tab="hoy" class="tabbtn flex-1 py-3.5 text-sm font-bold">Pedidos</button>
+    <button data-tab="cierre" class="tabbtn flex-1 py-3.5 text-sm font-bold">Cierre</button>
+  </nav>
+</section>
+
+<script>
+/* ====== CONFIGURACIÓN: pega aquí la URL de tu Web App (termina en /exec) ====== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbxGGlcv2gvBKfqfKVb0Wm7ReKNzRN7xod-mKaMDzQKtiC3NZylkvVbNdDHE0oU5O6j5Nw/exec';
+
+const MEDIOS = {
+  Efectivo:        { t: 'Efectivo',          on: 'bg-emerald-100 border-emerald-600 text-emerald-900', tag: 'bg-emerald-100 text-emerald-800' },
+  Nequi:           { t: 'Nequi',             on: 'bg-fuchsia-100 border-fuchsia-600 text-fuchsia-900', tag: 'bg-fuchsia-100 text-fuchsia-800' },
+  Empresa:         { t: 'Empresa',           on: 'bg-sky-100 border-sky-600 text-sky-900',             tag: 'bg-sky-100 text-sky-800' },
+  Fiado_Vendedora: { t: 'Fiado a vendedora', on: 'bg-amber-100 border-amber-600 text-amber-900',       tag: 'bg-amber-100 text-amber-800' }
+};
+const ESTADOS = ['Entregado', 'Pendiente', 'Devuelto'];
+
+const $ = s => document.querySelector(s);
+const cop = n => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const hoy = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+
+const S = { aux: null, pin: null, fecha: hoy(), medio: 'Efectivo', estado: 'Entregado', foto: null, tab: 'registrar' };
+
+/* ====== API (POST como text/plain = petición simple, sin preflight CORS) ====== */
+async function api(accion, datos = {}) {
+  const r = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ accion, auxiliar: S.aux, pin: S.pin, fecha: S.fecha, ...datos })
+  });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error);
+  return j.data;
+}
+
+function toast(msg, tipo = 'ok') {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'fixed inset-x-3 top-3 z-50 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-lg ' + (tipo === 'ok' ? 'bg-emerald-600' : 'bg-rose-600');
+  clearTimeout(toast.id);
+  toast.id = setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+async function conCarga(btn, fn) {
+  const txt = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Un momento…';
+  try { await fn(); } catch (e) { toast(e.message || 'No hay conexión', 'err'); }
+  btn.disabled = false; btn.textContent = txt;
+}
+
+/* ====== INICIO ====== */
+async function cargarAuxiliares() {
+  try {
+    const r = await fetch(API_URL + '?t=' + Date.now());
+    const j = await r.json();
+    $('#selAux').innerHTML = j.data.auxiliares.map(n => `<option>${esc(n)}</option>`).join('') || '<option value="">Sin auxiliares activos</option>';
+  } catch { $('#selAux').innerHTML = '<option value="">No se pudo cargar la lista</option>'; toast('Revisa la URL del Web App', 'err'); }
+}
+
+function entrar() {
+  $('#vLogin').classList.add('hidden');
+  $('#vApp').classList.remove('hidden');
+  $('#hAux').textContent = S.aux;
+  $('#fecha').value = S.fecha;
+  irA('registrar');
+}
+
+$('#btnLogin').onclick = () => conCarga($('#btnLogin'), async () => {
+  S.aux = $('#selAux').value; S.pin = $('#pin').value.trim();
+  if (!S.aux || !S.pin) throw new Error('Elige tu nombre e ingresa el PIN');
+  await api('login');
+  try { sessionStorage.setItem('sesion', JSON.stringify({ aux: S.aux, pin: S.pin })); } catch {}
+  $('#pin').value = '';
+  entrar();
+});
+
+$('#btnSalir').onclick = () => {
+  try { sessionStorage.removeItem('sesion'); } catch {}
+  S.aux = S.pin = null;
+  $('#vApp').classList.add('hidden');
+  $('#vLogin').classList.remove('hidden');
+};
+
+$('#fecha').onchange = e => { S.fecha = e.target.value || hoy(); irA(S.tab); };
+
+/* ====== NAVEGACIÓN ====== */
+function irA(tab) {
+  S.tab = tab;
+  ['registrar', 'hoy', 'cierre'].forEach(t => $('#tab-' + t).classList.toggle('hidden', t !== tab));
+  document.querySelectorAll('.tabbtn').forEach(b => {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle('text-slate-900', on); b.classList.toggle('text-slate-400', !on);
+    b.classList.toggle('border-t-4', on); b.classList.toggle('border-slate-900', on);
+  });
+  if (tab === 'hoy') cargarPedidos();
+  if (tab === 'cierre') cargarCierre();
+}
+document.querySelectorAll('.tabbtn').forEach(b => b.onclick = () => irA(b.dataset.tab));
+
+/* ====== REGISTRAR ====== */
+function pintarOpciones() {
+  $('#medios').innerHTML = Object.entries(MEDIOS).map(([k, m]) =>
+    `<button type="button" data-m="${k}" class="rounded-xl border-2 px-3 py-3 text-sm font-bold ${S.medio === k ? m.on : 'border-slate-200 bg-white text-slate-600'}">${m.t}</button>`).join('');
+  $('#estados').innerHTML = ['Entregado', 'Pendiente'].map(e =>
+    `<button type="button" data-e="${e}" class="rounded-xl border-2 px-3 py-3 text-sm font-bold ${S.estado === e ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600'}">${e}</button>`).join('');
+}
+$('#medios').onclick = e => { const b = e.target.closest('[data-m]'); if (b) { S.medio = b.dataset.m; pintarOpciones(); } };
+$('#estados').onclick = e => { const b = e.target.closest('[data-e]'); if (b) { S.estado = b.dataset.e; pintarOpciones(); } };
+
+// Reduce la foto a máx. 1024 px y JPEG 70 % para subirla rápido con datos móviles
+function reducir(file, max = 1024) {
+  return new Promise((ok, fail) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      ok(c.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = fail;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+$('#foto').onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const url = await reducir(f);
+    S.foto = { base64: url.split(',')[1] };
+    $('#fotoPrev').src = url; $('#fotoPrev').classList.remove('hidden');
+    $('#fotoTxt').textContent = 'Cambiar foto';
+  } catch { toast('No se pudo leer la foto', 'err'); }
+};
+
+$('#btnGuardar').onclick = () => conCarga($('#btnGuardar'), async () => {
+  const cliente = $('#cliente').value.trim(), valor = $('#valor').value;
+  if (!cliente) throw new Error('Escribe el nombre del cliente');
+  if (valor === '' || Number(valor) < 0) throw new Error('Escribe el valor del pedido');
+  await api('crear', {
+    cliente, detalle: $('#detalle').value.trim(), valor: Number(valor), medio: S.medio,
+    novedad: $('#novedad').value.trim(), estado: S.estado, foto: S.foto
+  });
+  ['cliente', 'detalle', 'valor', 'novedad'].forEach(id => $('#' + id).value = '');
+  $('#foto').value = ''; S.foto = null; $('#fotoPrev').classList.add('hidden'); $('#fotoTxt').textContent = 'Tomar foto';
+  S.estado = 'Entregado'; pintarOpciones();
+  toast('Pedido guardado');
+});
+
+/* ====== PEDIDOS DEL DÍA ====== */
+async function cargarPedidos() {
+  const cont = $('#tab-hoy');
+  cont.innerHTML = '<p class="py-10 text-center text-slate-400">Cargando…</p>';
+  try {
+    const lista = await api('listar');
+    if (!lista.length) { cont.innerHTML = '<p class="py-10 text-center text-slate-500">Aún no hay pedidos este día. Registra el primero en la pestaña Registrar.</p>'; return; }
+    cont.innerHTML = lista.map(p => `
+      <article class="card">
+        <div class="flex items-start justify-between gap-2">
+          <div><p class="font-bold">${esc(p.cliente)}</p><p class="text-sm text-slate-500">${esc(p.detalle)}</p></div>
+          <p class="whitespace-nowrap font-extrabold">${cop(p.valor)}</p>
+        </div>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${(MEDIOS[p.medio] || MEDIOS.Efectivo).tag}">${(MEDIOS[p.medio] || {}).t || esc(p.medio)}</span>
+          ${p.foto ? `<a href="${esc(p.foto)}" target="_blank" rel="noopener" class="text-xs font-semibold text-sky-700 underline">Ver foto</a>` : ''}
+          <select data-id="${esc(p.id)}" class="ml-auto rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm">
+            ${ESTADOS.map(e => `<option ${e === p.estado ? 'selected' : ''}>${e}</option>`).join('')}
+          </select>
+        </div>
+        ${p.novedad ? `<p class="mt-2 rounded-lg bg-slate-50 p-2 text-sm text-slate-600">Novedad: ${esc(p.novedad)}</p>` : ''}
+      </article>`).join('');
+  } catch (e) { cont.innerHTML = ''; toast(e.message, 'err'); }
+}
+
+$('#tab-hoy').onchange = async e => {
+  const s = e.target.closest('select[data-id]');
+  if (!s) return;
+  try { await api('estado', { id: s.dataset.id, estado: s.value }); toast('Estado actualizado'); }
+  catch (err) { toast(err.message, 'err'); cargarPedidos(); }
+};
+
+/* ====== CIERRE DE CAJA ====== */
+async function cargarCierre() {
+  const cont = $('#tab-cierre');
+  cont.innerHTML = '<p class="py-10 text-center text-slate-400">Calculando…</p>';
+  try {
+    const r = await api('resumen');
+    const filas = Object.entries(MEDIOS).map(([k, m]) =>
+      `<div class="flex items-center justify-between rounded-xl px-4 py-3 ${m.tag}"><span class="font-semibold">${m.t}</span><span class="text-lg font-extrabold">${cop(r.totales[k])}</span></div>`).join('');
+    const c = r.conteo;
+    cont.innerHTML = `
+      <div class="card">
+        <p class="text-sm text-slate-500">Ventas entregadas del día</p>
+        <p class="text-3xl font-extrabold">${cop(r.total)}</p>
+        <p class="mt-1 text-sm text-slate-500">${c.Entregado || 0} entregados · ${c.Pendiente || 0} pendientes · ${c.Devuelto || 0} devueltos</p>
+        ${c.Pendiente ? '<p class="mt-2 rounded-lg bg-amber-50 p-2 text-sm font-semibold text-amber-800">Tienes pedidos pendientes: no suman al cuadre hasta que los marques como entregados.</p>' : ''}
+      </div>
+      <div class="mt-3 space-y-2">${filas}</div>
+      <div class="card mt-3">
+        <p class="text-sm text-slate-500">Efectivo que debe haber en caja</p>
+        <p class="text-2xl font-extrabold text-emerald-700">${cop(r.totales.Efectivo)}</p>
+        <label class="lbl" for="contado">Efectivo contado</label>
+        <input id="contado" type="number" inputmode="numeric" min="0" class="inp" placeholder="0" value="${r.cierre ? r.cierre.contado : ''}">
+        <p id="dif" class="mt-2 text-sm font-bold"></p>
+        <label class="lbl" for="obs">Observaciones del cierre</label>
+        <textarea id="obs" rows="2" class="inp" placeholder="Opcional">${r.cierre ? esc(r.cierre.obs) : ''}</textarea>
+        <button id="btnCerrar" class="btn mt-4">${r.cierre ? 'Actualizar cierre' : 'Guardar cierre'}</button>
+        ${r.cierre ? '<p class="mt-2 text-center text-xs text-slate-500">Este día ya tiene un cierre guardado.</p>' : ''}
+      </div>`;
+    const dif = () => {
+      const v = $('#contado').value;
+      const el = $('#dif');
+      if (v === '') { el.textContent = ''; return; }
+      const d = Number(v) - r.totales.Efectivo;
+      el.textContent = d === 0 ? 'La caja cuadra.' : d > 0 ? `Sobran ${cop(d)}` : `Faltan ${cop(-d)}`;
+      el.className = 'mt-2 text-sm font-bold ' + (d === 0 ? 'text-emerald-700' : 'text-rose-600');
+    };
+    $('#contado').oninput = dif; dif();
+    $('#btnCerrar').onclick = () => conCarga($('#btnCerrar'), async () => {
+      if ($('#contado').value === '') throw new Error('Escribe el efectivo contado');
+      await api('cerrar', { efectivo_contado: Number($('#contado').value), observaciones: $('#obs').value.trim() });
+      toast('Cierre guardado');
+      cargarCierre();
+    });
+  } catch (e) { cont.innerHTML = ''; toast(e.message, 'err'); }
+}
+
+/* ====== ARRANQUE ====== */
+pintarOpciones();
+cargarAuxiliares();
+try {
+  const ses = JSON.parse(sessionStorage.getItem('sesion') || 'null');
+  if (ses) { S.aux = ses.aux; S.pin = ses.pin; entrar(); }
+} catch {}
+</script>
+</body>
+</html>
