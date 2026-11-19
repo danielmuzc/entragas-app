@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12343b">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Entregas y cuadre de caja</title>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -16,6 +19,7 @@
   .inp { width:100%; border:1.5px solid var(--linea); background:#fff; border-radius:10px; padding:.8rem 1rem; font:inherit; }
   .inp:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visible { outline:3px solid #3a8fa3; outline-offset:2px; }
   .btn { width:100%; border-radius:999px; background:var(--tinta); color:#fff; padding:.95rem; font-weight:700; }
+  .btn.sm { padding:.7rem; margin-top:.6rem; }
   .btn:active { transform:scale(.98); } .btn:disabled { opacity:.5; }
   .opt { border:2px solid var(--linea); background:#fff; border-radius:10px; padding:.8rem .5rem; font-weight:700; color:var(--suave); }
   .vacio { padding:2.5rem 1rem; text-align:center; color:var(--suave); }
@@ -29,10 +33,11 @@
   .total { font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:2.4rem; line-height:1.1; margin-top:.2rem; }
   .fila { display:flex; align-items:baseline; padding:.3rem 0; }
   .fila u { flex:1; margin:0 .45rem; border-bottom:2px dotted var(--linea); transform:translateY(-.2rem); }
-  .fila b { font-weight:700; }
+  .fila b { font-weight:700; text-align:right; }
   .punto { display:inline-block; width:.6rem; height:.6rem; border-radius:50%; margin-right:.5rem; }
   .panel { background:#fff; border-radius:14px; padding:1.1rem; }
   .grande { font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:1.8rem; color:var(--ok); }
+  .corte { border-top:2px dashed var(--linea); margin-top:.8rem; padding-top:.8rem; }
 
   /* Pedido del auxiliar: la barra lateral codifica el medio de pago */
   .pedido { background:#fff; border-radius:12px; border-left:6px solid var(--linea); padding:.85rem 1rem; margin-bottom:.7rem; }
@@ -46,8 +51,10 @@
   .aux > summary { display:flex; flex-wrap:wrap; align-items:baseline; gap:.2rem .6rem; padding:.95rem 1rem; }
   .aux > summary::after, .ped > summary::after { content:""; width:.5rem; height:.5rem; margin-left:auto; border-right:2px solid var(--suave); border-bottom:2px solid var(--suave); transform:rotate(45deg); transition:transform .15s; align-self:center; }
   .aux[open] > summary::after, .ped[open] > summary::after { transform:rotate(-135deg); }
-  .aux .cuerpo { padding:0 1rem 1rem; border-top:1px solid var(--fondo); }
+  .aux .cuerpo { padding:.6rem 1rem 1rem; border-top:1px solid var(--fondo); }
   .caja { flex-basis:100%; font-size:.85rem; font-weight:700; }
+  .cargue { padding:.2rem 0 .4rem; }
+  .cargue label { display:block; font-size:.8rem; font-weight:700; color:var(--suave); }
   .ped { border-top:1px solid var(--fondo); }
   .ped > summary { display:flex; flex-wrap:wrap; align-items:center; gap:.25rem .5rem; padding:.6rem 0; }
   .ped .cli { font-weight:700; flex:1 1 40%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -74,12 +81,13 @@
 
 <!-- APP -->
 <section id="vApp" class="mx-auto hidden max-w-md">
-  <header class="sticky top-0 z-20 flex items-center justify-between px-4 pb-3 text-white" style="background:var(--tinta);padding-top:calc(.75rem + env(safe-area-inset-top,0px))">
+  <header class="sticky top-0 z-20 flex flex-wrap items-center justify-between px-4 pb-3 text-white" style="background:var(--tinta);padding-top:calc(.75rem + env(safe-area-inset-top,0px))">
     <div>
       <p id="hAux" class="display text-lg"></p>
       <input id="fecha" type="date" class="mt-0.5 rounded px-2 py-0.5 text-xs" style="background:#1d4750;color:#d6e4e8">
     </div>
     <button id="btnSalir" class="text-sm underline">Salir</button>
+    <button id="barra" class="mt-2 hidden w-full basis-full rounded-lg px-3 py-1.5 text-left text-xs font-bold"></button>
   </header>
 
   <main class="p-4 pb-28">
@@ -87,12 +95,14 @@
     <div id="tab-registrar">
       <label class="lbl" style="margin-top:0" for="cliente">Cliente</label>
       <input id="cliente" class="inp" autocomplete="off" placeholder="Nombre del cliente">
-      <label class="lbl" for="detalle">Descripción del pedido</label>
-      <textarea id="detalle" rows="2" class="inp" placeholder="Qué se entregó"></textarea>
       <label class="lbl" for="valor">Valor (COP)</label>
       <input id="valor" type="number" inputmode="numeric" min="0" class="inp" placeholder="0">
       <span class="lbl">Medio de pago</span>
       <div id="medios" class="grid grid-cols-2 gap-2"></div>
+      <div id="otroBox" class="hidden">
+        <label class="lbl" for="otroMedio">¿Cuál fue el medio de pago?</label>
+        <input id="otroMedio" class="inp" autocomplete="off" placeholder="Ej: Daviplata, transferencia, bono">
+      </div>
       <span class="lbl">Foto de la entrega</span>
       <label class="opt flex cursor-pointer items-center justify-center" style="border-style:dashed;padding:1rem">
         <span id="fotoTxt">Tomar foto</span>
@@ -126,7 +136,8 @@ const MEDIOS = {
   Efectivo:        { t: 'Efectivo',          c: '#2f7d4f', bg: '#e1f1e7' },
   Nequi:           { t: 'Nequi',             c: '#7b2fbf', bg: '#efe4fa' },
   Empresa:         { t: 'Empresa',           c: '#255fa8', bg: '#e0ebf8' },
-  Fiado_Vendedora: { t: 'Fiado a vendedora', c: '#a8680f', bg: '#fbedd5' }
+  Fiado_Vendedora: { t: 'Fiado a vendedora', c: '#a8680f', bg: '#fbedd5' },
+  Otros:           { t: 'Otros',             c: '#46606b', bg: '#e3eaee' }
 };
 const ESTADOS = ['Entregado', 'Pendiente', 'Devuelto'];
 const TABS = ['registrar', 'hoy', 'cierre', 'admin'];
@@ -136,23 +147,174 @@ const cop = n => new Intl.NumberFormat('es-CO', { style: 'currency', currency: '
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const hoy = () => new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10); // Colombia = UTC-5
 const medio = k => MEDIOS[k] || { t: esc(k), c: '#5d7580', bg: '#e4eaee' };
+const etiquetaMedio = p => p.medio === 'Otros' && p.medioOtro ? `Otros: ${esc(p.medioOtro)}` : medio(p.medio).t;
+const plural = n => `${n} ${n === 1 ? 'pedido' : 'pedidos'}`;
 
 const S = { aux: null, pin: null, rol: null, fecha: hoy(), medio: 'Efectivo', estado: 'Entregado', foto: null, tab: 'registrar' };
+
+/* ====== ALMACÉN LOCAL (IndexedDB): cola de envíos y copia de cada día ====== */
+const DB = (() => {
+  let abierta;
+  const abrir = () => abierta = abierta || new Promise((ok, no) => {
+    const r = indexedDB.open('entregas', 1);
+    r.onupgradeneeded = () => {
+      r.result.createObjectStore('cola', { keyPath: 'k', autoIncrement: true });
+      r.result.createObjectStore('cache', { keyPath: 'key' });
+    };
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => no(r.error);
+  });
+  const op = async (store, modo, fn) => {
+    const db = await abrir();
+    return new Promise((ok, no) => {
+      const t = db.transaction(store, modo), q = fn(t.objectStore(store));
+      t.oncomplete = () => ok(q.result);
+      t.onerror = t.onabort = () => no(t.error);
+    });
+  };
+  return {
+    poner: (s, v) => op(s, 'readwrite', o => o.put(v)),
+    todos: s => op(s, 'readonly', o => o.getAll()),
+    uno: (s, k) => op(s, 'readonly', o => o.get(k)),
+    borrar: (s, k) => op(s, 'readwrite', o => o.delete(k))
+  };
+})();
 
 /* ====== API (POST como text/plain = petición simple, sin preflight CORS) ====== */
 async function api(accion, datos = {}) {
   let j;
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 60000);
   try {
     const r = await fetch(API_URL, {
-      method: 'POST',
+      method: 'POST', signal: ctl.signal,
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ accion, auxiliar: S.aux, pin: S.pin, fecha: S.fecha, ...datos })
     });
     j = await r.json();
-  } catch { throw new Error('Sin conexión o URL del Web App incorrecta'); }
+  } catch { const e = new Error('Sin conexión o URL del Web App incorrecta'); e.red = true; throw e; }
+  finally { clearTimeout(t); }
   if (!j.ok) throw new Error(j.error);
   return j.data;
 }
+
+/* ====== MODO SIN CONEXIÓN: todo se guarda primero en el celular y luego se envía ====== */
+const pendientes = async () => (await DB.todos('cola')).filter(o => o.aux === S.aux).sort((a, b) => a.k - b.k);
+
+async function encolar(accion, datos) {
+  await DB.poner('cola', { accion, datos, aux: S.aux, creado: Date.now() });
+  pintarBarra(); sincronizar();
+}
+
+function sumar(ps) {
+  const t = { Efectivo: 0, Nequi: 0, Empresa: 0, Fiado_Vendedora: 0, Otros: 0 };
+  const n = { Entregado: 0, Pendiente: 0, Devuelto: 0 };
+  ps.forEach(p => { n[p.estado] = (n[p.estado] || 0) + 1; if (p.estado === 'Entregado' && t[p.medio] !== undefined) t[p.medio] += p.valor; });
+  return { totales: t, conteo: n, total: Object.values(t).reduce((a, b) => a + b, 0) };
+}
+
+// Datos del día = última copia del servidor + lo que aún está en la cola (sin enviar)
+async function datosDia(fecha) {
+  const c = await DB.uno('cache', S.aux + '|' + fecha);
+  const base = ((c && c.pedidos) || []).map(p => ({ ...p }));
+  const idx = new Map(base.map(p => [p.id, p]));
+  const locales = [];
+  let cierre = c ? c.cierre : null;
+  for (const o of await pendientes()) {
+    const d = o.datos;
+    if (d.fecha !== fecha) continue;
+    if (o.accion === 'crear' && !idx.has(d.id)) {
+      const p = { id: d.id, cliente: d.cliente, medio: d.medio, medioOtro: d.medio_otro || '', valor: d.valor, foto: d.foto ? 'local' : '', novedad: d.novedad, estado: d.estado, local: true, error: o.error };
+      idx.set(d.id, p); locales.unshift(p);
+    } else if (o.accion === 'estado' && idx.has(d.id)) Object.assign(idx.get(d.id), { estado: d.estado, local: true });
+    else if (o.accion === 'cerrar') cierre = { contado: d.efectivo_contado, obs: d.observaciones, local: true };
+  }
+  return { pedidos: [...locales, ...base], cierre, hayCache: !!c };
+}
+
+async function refrescarCache(fecha) {
+  const [pedidos, r] = await Promise.all([api('listar', { fecha }), api('resumen', { fecha })]);
+  await DB.poner('cache', { key: S.aux + '|' + fecha, pedidos, cierre: r.cierre, ts: Date.now() });
+}
+
+let sincronizando = false;
+async function sincronizar() {
+  if (sincronizando || !S.aux || S.rol === 'Admin') return;
+  if (!navigator.onLine) { pintarBarra(); return; }
+  sincronizando = true; pintarBarra();
+  const fechas = new Set();
+  let avisado = false;
+  try {
+    for (const op of await pendientes()) {
+      try { await api(op.accion, op.datos); await DB.borrar('cola', op.k); fechas.add(op.datos.fecha); }
+      catch (e) {
+        if (e.red) break; // sin señal: se reintenta después, nada se pierde
+        op.error = e.message; await DB.poner('cola', op);
+        if (!avisado) { avisado = true; error('No se pudo enviar un registro: ' + e.message); }
+      }
+    }
+    for (const f of fechas) await refrescarCache(f).catch(() => {});
+  } finally { sincronizando = false; }
+  await pintarBarra();
+  if (fechas.size && S.tab === 'hoy') pintarPedidos();
+  if (fechas.size && S.tab === 'cierre' && !document.activeElement.matches('input,textarea')) cargarCierre();
+}
+
+async function pintarBarra() {
+  const b = $('#barra');
+  if (!S.aux || S.rol === 'Admin') { b.classList.add('hidden'); return; }
+  const cola = await pendientes(), err = cola.filter(o => o.error).length;
+  let txt = '', fondo = '#fbedd5', color = 'var(--pend)';
+  if (err) { txt = `${err} sin poder enviar: toca para reintentar`; fondo = '#f6d9d7'; color = 'var(--dev)'; }
+  else if (!navigator.onLine) txt = cola.length ? `Sin conexión: ${cola.length} guardados en el celular` : 'Sin conexión: tus pedidos se guardan en el celular';
+  else if (cola.length) txt = sincronizando ? `Enviando ${cola.length}…` : `${cola.length} sin enviar: toca para reintentar`;
+  b.classList.toggle('hidden', !txt);
+  b.textContent = txt; b.style.background = fondo; b.style.color = color;
+}
+$('#barra').onclick = () => sincronizar();
+
+/* ====== RESPALDO POR WHATSAPP (el auxiliar elige el chat en el menú de compartir) ====== */
+const fmtFecha = f => f.split('-').reverse().join('/');
+const btnRespaldo = txt => `<button data-respaldo class="btn sm" style="background:#fff;color:var(--tinta);border:2px solid var(--tinta)">${txt}</button>`;
+const firma = d => {
+  const s = d.pedidos.map(p => p.id + p.estado + p.valor).join('|') + (d.cierre ? d.cierre.contado : '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
+};
+const claveRespaldo = () => 'respaldo|' + S.aux + '|' + S.fecha;
+
+function estadoRespaldo(d) {
+  let g = null;
+  try { g = JSON.parse(localStorage.getItem(claveRespaldo())); } catch {}
+  return !g ? 'Aún no has enviado el respaldo de este día.' : g.f === firma(d) ? 'Respaldo enviado, sin cambios desde entonces.' : 'Hay cambios desde el último respaldo: envíalo de nuevo.';
+}
+
+async function respaldar() {
+  const d = await datosDia(S.fecha), r = sumar(d.pedidos), pend = (await pendientes()).length;
+  const lineas = [...d.pedidos].reverse().map((p, i) => {
+    const m = p.medio === 'Otros' && p.medioOtro ? `Otros (${p.medioOtro})` : (MEDIOS[p.medio] || { t: p.medio }).t;
+    return `${i + 1}. ${p.cliente} | ${cop(p.valor)} | ${m} | ${p.estado}` + (p.novedad ? `\n   Novedad: ${p.novedad}` : '');
+  });
+  const tot = Object.entries(MEDIOS).filter(([k]) => r.totales[k]).map(([k, m]) => `${m.t}: ${cop(r.totales[k])}`);
+  const texto = [
+    `RESPALDO ${fmtFecha(S.fecha)} - ${S.aux}`, ...lineas, '',
+    `Entregado: ${cop(r.total)}` + (tot.length ? ` (${tot.join(', ')})` : ''),
+    `Pendientes: ${r.conteo.Pendiente}, devueltos: ${r.conteo.Devuelto}`,
+    d.cierre ? `Efectivo esperado: ${cop(r.totales.Efectivo)}, contado: ${cop(d.cierre.contado)}` : 'Cierre de caja: sin hacer',
+    `Sin sincronizar: ${pend}`
+  ].join('\n');
+  try {
+    if (navigator.share) await navigator.share({ text: texto });
+    else location.href = 'whatsapp://send?text=' + encodeURIComponent(texto);
+    try { localStorage.setItem(claveRespaldo(), JSON.stringify({ f: firma(d) })); } catch {}
+    if (S.tab === 'cierre') cargarCierre();
+  } catch (e) {
+    if (e.name === 'AbortError') return; // el auxiliar cerró el menú sin enviar
+    try { await navigator.clipboard.writeText(texto); } catch {}
+    error('No se pudo abrir WhatsApp. El resumen quedó copiado: pégalo en el chat.');
+  }
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-respaldo]')) respaldar(); });
 
 function error(msg) {
   const t = $('#toast');
@@ -173,7 +335,10 @@ async function cargarUsuarios() {
   try {
     const j = await (await fetch(API_URL + '?t=' + Date.now())).json();
     $('#selAux').innerHTML = j.data.auxiliares.map(n => `<option>${esc(n)}</option>`).join('') || '<option value="">Sin usuarios activos</option>';
-  } catch { $('#selAux').innerHTML = '<option value="">No se pudo cargar la lista</option>'; error('Revisa la URL del Web App'); }
+  } catch {
+    $('#selAux').innerHTML = '<option value="">No se pudo cargar la lista</option>';
+    error(navigator.onLine ? 'Revisa la URL del Web App' : 'Sin conexión: la primera vez necesitas señal para iniciar sesión');
+  }
 }
 
 function entrar() {
@@ -184,25 +349,31 @@ function entrar() {
   $('#fecha').value = S.fecha;
   $('#nav').classList.toggle('hidden', admin);
   irA(admin ? 'admin' : 'registrar');
+  if (!admin) { pintarBarra(); sincronizar(); }
 }
 
 $('#btnLogin').onclick = () => conCarga($('#btnLogin'), async () => {
   S.aux = $('#selAux').value; S.pin = $('#pin').value.trim();
   if (!S.aux || !S.pin) throw new Error('Elige tu nombre e ingresa el PIN');
   S.rol = (await api('login')).rol;
-  try { sessionStorage.setItem('sesion', JSON.stringify({ aux: S.aux, pin: S.pin, rol: S.rol })); } catch {}
+  S.manual = false;
+  try { localStorage.setItem('sesion', JSON.stringify({ aux: S.aux, pin: S.pin, rol: S.rol })); } catch {}
   $('#pin').value = '';
   entrar();
 });
 
-$('#btnSalir').onclick = () => {
-  try { sessionStorage.removeItem('sesion'); } catch {}
+$('#btnSalir').onclick = async () => {
+  const n = S.rol === 'Admin' ? 0 : (await pendientes()).length;
+  if (n && !confirm(`Tienes ${n} sin enviar. Se enviarán cuando vuelvas a entrar con señal. Antes de salir, envía el respaldo por WhatsApp. ¿Salir de todas formas?`)) return;
+  try { localStorage.removeItem('sesion'); } catch {}
   S.aux = S.pin = S.rol = null;
+  ['hoy', 'cierre', 'admin'].forEach(t => $('#tab-' + t).innerHTML = '');
+  $('#barra').classList.add('hidden');
   $('#vApp').classList.add('hidden');
   $('#vLogin').classList.remove('hidden');
 };
 
-$('#fecha').onchange = e => { S.fecha = e.target.value || hoy(); irA(S.tab); };
+$('#fecha').onchange = e => { S.manual = true; S.fecha = e.target.value || hoy(); irA(S.tab); };
 
 /* ====== NAVEGACIÓN ====== */
 function irA(tab) {
@@ -229,8 +400,14 @@ function pintarOpciones() {
     const on = S.estado === e;
     return `<button type="button" class="opt" data-e="${e}" style="${on ? 'background:var(--tinta);border-color:var(--tinta);color:#fff' : ''}">${e}</button>`;
   }).join('');
+  $('#otroBox').classList.toggle('hidden', S.medio !== 'Otros');
 }
-$('#medios').onclick = e => { const b = e.target.closest('[data-m]'); if (b) { S.medio = b.dataset.m; pintarOpciones(); } };
+$('#medios').onclick = e => {
+  const b = e.target.closest('[data-m]');
+  if (!b) return;
+  S.medio = b.dataset.m; pintarOpciones();
+  if (S.medio === 'Otros') $('#otroMedio').focus();
+};
 $('#estados').onclick = e => { const b = e.target.closest('[data-e]'); if (b) { S.estado = b.dataset.e; pintarOpciones(); } };
 
 // Reduce la foto a máx. 1024 px y JPEG 70 % para subirla rápido con datos móviles
@@ -261,16 +438,18 @@ $('#foto').onchange = async e => {
   } catch { error('No se pudo leer la foto'); }
 };
 
-// Al guardar se limpia el formulario y se abre la lista de pedidos: ahí se ve el pedido nuevo
+// Guardar es instantáneo: el pedido queda en el celular y se envía a Sheets cuando hay señal
 $('#btnGuardar').onclick = () => conCarga($('#btnGuardar'), async () => {
-  const cliente = $('#cliente').value.trim(), valor = $('#valor').value;
+  const cliente = $('#cliente').value.trim(), valor = $('#valor').value, otro = $('#otroMedio').value.trim();
   if (!cliente) throw new Error('Escribe el nombre del cliente');
   if (valor === '' || Number(valor) < 0) throw new Error('Escribe el valor del pedido');
-  await api('crear', {
-    cliente, detalle: $('#detalle').value.trim(), valor: Number(valor), medio: S.medio,
+  if (S.medio === 'Otros' && !otro) throw new Error('Especifica cuál fue el medio de pago');
+  const id = crypto.randomUUID ? crypto.randomUUID() : 'p' + Date.now() + Math.random().toString(36).slice(2);
+  await encolar('crear', {
+    id, fecha: S.fecha, cliente, valor: Number(valor), medio: S.medio, medio_otro: S.medio === 'Otros' ? otro : '',
     novedad: $('#novedad').value.trim(), estado: S.estado, foto: S.foto
   });
-  ['cliente', 'detalle', 'valor', 'novedad'].forEach(id => $('#' + id).value = '');
+  ['cliente', 'valor', 'otroMedio', 'novedad'].forEach(id => $('#' + id).value = '');
   $('#foto').value = ''; S.foto = null; $('#fotoPrev').classList.add('hidden'); $('#fotoTxt').textContent = 'Tomar foto';
   S.estado = 'Entregado'; pintarOpciones();
   irA('hoy');
@@ -278,37 +457,44 @@ $('#btnGuardar').onclick = () => conCarga($('#btnGuardar'), async () => {
 
 /* ====== PEDIDOS DEL AUXILIAR ====== */
 async function cargarPedidos() {
-  const cont = $('#tab-hoy');
-  cont.innerHTML = '<p class="vacio">Cargando…</p>';
-  try {
-    const lista = await api('listar');
-    if (!lista.length) { cont.innerHTML = '<p class="vacio">Aún no hay pedidos en esta fecha. Registra el primero en la pestaña Registrar.</p>'; return; }
-    cont.innerHTML = lista.map(p => {
-      const m = medio(p.medio);
-      return `
-      <article class="pedido" style="border-left-color:${m.c}">
-        <div class="flex items-start justify-between gap-2">
-          <div><p class="font-bold">${esc(p.cliente)}</p><p class="nota" style="margin:0">${esc(p.detalle)}</p></div>
-          <p class="whitespace-nowrap text-lg font-bold">${cop(p.valor)}</p>
-        </div>
-        <div class="mt-2 flex flex-wrap items-center gap-2">
-          <span class="chip" style="background:${m.bg};color:${m.c}">${m.t}</span>
-          ${linkFoto(p.foto)}
-          <select class="sel" data-id="${esc(p.id)}" aria-label="Estado del pedido">
-            ${ESTADOS.map(e => `<option ${e === p.estado ? 'selected' : ''}>${e}</option>`).join('')}
-          </select>
-        </div>
-        ${p.novedad ? `<p class="nota">Novedad: ${esc(p.novedad)}</p>` : ''}
-      </article>`;
-    }).join('');
-  } catch (e) { cont.innerHTML = ''; error(e.message); }
+  await pintarPedidos(); // inmediato, desde el celular
+  if (!navigator.onLine) return;
+  try { await refrescarCache(S.fecha); if (S.tab === 'hoy') await pintarPedidos(); } catch {}
+}
+
+async function pintarPedidos() {
+  const cont = $('#tab-hoy'), d = await datosDia(S.fecha);
+  if (!d.pedidos.length) {
+    cont.innerHTML = `<p class="vacio">${d.hayCache || !navigator.onLine ? 'Aún no hay pedidos en esta fecha. Registra el primero en la pestaña Registrar.' : 'Cargando…'}</p>`;
+    return;
+  }
+  cont.innerHTML = `<div class="mb-3">${btnRespaldo('Enviar respaldo por WhatsApp')}</div>` + d.pedidos.map(p => {
+    const m = medio(p.medio);
+    return `
+    <article class="pedido" style="border-left-color:${m.c}">
+      <div class="flex items-start justify-between gap-2">
+        <p class="font-bold">${esc(p.cliente)}</p>
+        <p class="whitespace-nowrap text-lg font-bold">${cop(p.valor)}</p>
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <span class="chip" style="background:${m.bg};color:${m.c}">${etiquetaMedio(p)}</span>
+        ${p.local ? '<span class="chip" style="background:#fbedd5;color:var(--pend)">Sin enviar</span>' : ''}
+        ${p.foto === 'local' ? '<span class="nota" style="margin:0">Foto guardada en el celular</span>' : linkFoto(p.foto)}
+        <select class="sel" data-id="${esc(p.id)}" aria-label="Estado del pedido">
+          ${ESTADOS.map(e => `<option ${e === p.estado ? 'selected' : ''}>${e}</option>`).join('')}
+        </select>
+      </div>
+      ${p.novedad ? `<p class="nota">Novedad: ${esc(p.novedad)}</p>` : ''}
+      ${p.error ? `<p class="nota" style="color:var(--dev);font-weight:700">No se pudo enviar: ${esc(p.error)}</p>` : ''}
+    </article>`;
+  }).join('');
 }
 
 $('#tab-hoy').onchange = async e => {
   const s = e.target.closest('select[data-id]');
   if (!s) return;
-  try { await api('estado', { id: s.dataset.id, estado: s.value }); }
-  catch (err) { error(err.message); cargarPedidos(); }
+  await encolar('estado', { id: s.dataset.id, estado: s.value, fecha: S.fecha });
+  pintarPedidos();
 };
 
 function linkFoto(u) {
@@ -325,45 +511,82 @@ const cajaTxt = c => !c ? 'Sin cierre' : c.diferencia === 0 ? 'Caja cuadrada' : 
 
 async function cargarCierre() {
   const cont = $('#tab-cierre');
-  cont.innerHTML = '<p class="vacio">Calculando…</p>';
-  try {
-    const r = await api('resumen');
-    cont.innerHTML = `
-      <div class="slip">
-        <h2>Cuadre del día</h2>
-        <p class="total">${cop(r.total)}</p>
-        <p class="nota" style="margin-bottom:.6rem">${conteoTxt(r.conteo)}</p>
-        ${filasMedios(r.totales)}
-        ${r.conteo.Pendiente ? '<p class="nota" style="color:var(--pend);font-weight:700">Los pedidos pendientes no suman hasta que los marques como entregados.</p>' : ''}
-      </div>
-      <div class="panel">
-        <p class="nota" style="margin:0">Efectivo que debe haber en caja</p>
-        <p class="grande">${cop(r.totales.Efectivo)}</p>
-        <label class="lbl" for="contado">Efectivo contado</label>
-        <input id="contado" type="number" inputmode="numeric" min="0" class="inp" placeholder="0" value="${r.cierre ? r.cierre.contado : ''}">
-        <p id="dif" class="mt-2 text-sm font-bold"></p>
-        <label class="lbl" for="obs">Observaciones del cierre</label>
-        <textarea id="obs" rows="2" class="inp" placeholder="Opcional">${r.cierre ? esc(r.cierre.obs) : ''}</textarea>
-        <button id="btnCerrar" class="btn mt-4">${r.cierre ? 'Actualizar cierre' : 'Guardar cierre'}</button>
-        ${r.cierre ? '<p class="nota" style="text-align:center">Este día ya tiene un cierre guardado.</p>' : ''}
-      </div>`;
-    const dif = () => {
-      const v = $('#contado').value, el = $('#dif');
-      if (v === '') { el.textContent = ''; return; }
-      const d = Number(v) - r.totales.Efectivo;
-      el.textContent = d === 0 ? 'La caja cuadra.' : d > 0 ? `Sobran ${cop(d)}` : `Faltan ${cop(-d)}`;
-      el.style.color = d === 0 ? 'var(--ok)' : 'var(--dev)';
-    };
-    $('#contado').oninput = dif; dif();
-    $('#btnCerrar').onclick = () => conCarga($('#btnCerrar'), async () => {
-      if ($('#contado').value === '') throw new Error('Escribe el efectivo contado');
-      await api('cerrar', { efectivo_contado: Number($('#contado').value), observaciones: $('#obs').value.trim() });
-      await cargarCierre();
-    });
-  } catch (e) { cont.innerHTML = ''; error(e.message); }
+  if (navigator.onLine && !(await DB.uno('cache', S.aux + '|' + S.fecha))) {
+    cont.innerHTML = '<p class="vacio">Calculando…</p>';
+    await Promise.race([refrescarCache(S.fecha).catch(() => {}), new Promise(ok => setTimeout(ok, 8000))]);
+  }
+  const d = await datosDia(S.fecha), r = sumar(d.pedidos), c = d.cierre;
+  cont.innerHTML = `
+    <div class="slip">
+      <h2>Cuadre del día</h2>
+      <p class="total">${cop(r.total)}</p>
+      <p class="nota" style="margin-bottom:.6rem">${conteoTxt(r.conteo)}</p>
+      ${filasMedios(r.totales)}
+      ${r.conteo.Pendiente ? '<p class="nota" style="color:var(--pend);font-weight:700">Los pedidos pendientes no suman hasta que los marques como entregados.</p>' : ''}
+    </div>
+    <div class="panel">
+      <p class="nota" style="margin:0">Efectivo que debe haber en caja</p>
+      <p class="grande">${cop(r.totales.Efectivo)}</p>
+      <label class="lbl" for="contado">Efectivo contado</label>
+      <input id="contado" type="number" inputmode="numeric" min="0" class="inp" placeholder="0" value="${c ? c.contado : ''}">
+      <p id="dif" class="mt-2 text-sm font-bold"></p>
+      <label class="lbl" for="obs">Observaciones del cierre</label>
+      <textarea id="obs" rows="2" class="inp" placeholder="Opcional">${c ? esc(c.obs) : ''}</textarea>
+      <button id="btnCerrar" class="btn mt-4">${c ? 'Actualizar cierre' : 'Guardar cierre'}</button>
+      ${c ? `<p class="nota" style="text-align:center">${c.local ? 'Guardado en el celular: se enviará al volver la señal.' : 'Este día ya tiene un cierre guardado.'}</p>` : ''}
+    </div>
+    <div class="panel mt-3">
+      <p class="nota" style="margin:0 0 .2rem">${estadoRespaldo(d)}</p>
+      ${btnRespaldo('Enviar respaldo por WhatsApp')}
+    </div>`;
+  const dif = () => {
+    const v = $('#contado').value, el = $('#dif');
+    if (v === '') { el.textContent = ''; return; }
+    const x = Number(v) - r.totales.Efectivo;
+    el.textContent = x === 0 ? 'La caja cuadra.' : x > 0 ? `Sobran ${cop(x)}` : `Faltan ${cop(-x)}`;
+    el.style.color = x === 0 ? 'var(--ok)' : 'var(--dev)';
+  };
+  $('#contado').oninput = dif; dif();
+  $('#btnCerrar').onclick = () => conCarga($('#btnCerrar'), async () => {
+    if ($('#contado').value === '') throw new Error('Escribe el efectivo contado');
+    for (const o of await pendientes()) if (o.accion === 'cerrar' && o.datos.fecha === S.fecha) await DB.borrar('cola', o.k);
+    await encolar('cerrar', { fecha: S.fecha, efectivo_contado: Number($('#contado').value), observaciones: $('#obs').value.trim() });
+    await cargarCierre();
+  });
 }
 
 /* ====== ADMINISTRADOR ====== */
+// Estado del cargue general del día: texto y color
+function estadoCargue(c) {
+  if (!c) return { txt: 'Sin cargue definido', col: 'var(--suave)' };
+  if (c.faltaValor === 0 && c.faltaPedidos === 0) return { txt: 'Cargue cuadrado', col: 'var(--ok)' };
+  if (c.faltaValor < 0 || c.faltaPedidos < 0) return { txt: 'Las entregas superan el cargue', col: 'var(--dev)' };
+  return { txt: 'Falta cuadrar el cargue', col: 'var(--pend)' };
+}
+
+function resumenCargue(c) {
+  const e = estadoCargue(c);
+  const lin = (t, v, n, col) => `<div class="fila"><span>${t}</span><u></u><b${col ? ` style="color:${col}"` : ''}>${cop(v)} (${plural(n)})</b></div>`;
+  const dif = c.faltaValor < 0 || c.faltaPedidos < 0;
+  return lin('Cargue', c.valor, c.pedidos) + lin('Entregado', c.entregado, c.entregadoN) + lin('Devuelto', c.devuelto, c.devueltoN)
+    + lin(dif ? 'Diferencia' : 'Falta por entregar', c.faltaValor, c.faltaPedidos, e.col)
+    + (c.faltaValor > 0 ? '<p class="nota">Lo que falta debe regresar como devolución.</p>' : '');
+}
+
+function bloqueCargue(c) {
+  const e = estadoCargue(c);
+  return `
+    <div class="cargue">
+      <p class="display" style="color:${e.col}">${e.txt}</p>
+      ${c ? resumenCargue(c) : ''}
+      <div class="mt-2 grid grid-cols-2 gap-2">
+        <label>Total del cargue<input class="inp cv" type="number" inputmode="numeric" min="0" placeholder="0" value="${c ? c.valor : ''}"></label>
+        <label>Cantidad de pedidos<input class="inp cc" type="number" inputmode="numeric" min="0" placeholder="0" value="${c ? c.pedidos : ''}"></label>
+      </div>
+      <button class="btn sm" data-cargue="1">${c ? 'Actualizar cargue' : 'Guardar cargue'}</button>
+    </div>`;
+}
+
 function filaPedido(p) {
   const m = medio(p.medio);
   return `
@@ -375,26 +598,25 @@ function filaPedido(p) {
         <span class="est ${esc(p.estado)}">${esc(p.estado)}</span>
       </summary>
       <div class="det">
-        ${p.detalle ? `<p>${esc(p.detalle)}</p>` : ''}
+        ${p.medio === 'Otros' && p.medioOtro ? `<p>Medio de pago: ${esc(p.medioOtro)}</p>` : ''}
         ${p.novedad ? `<p>Novedad: ${esc(p.novedad)}</p>` : ''}
         ${linkFoto(p.foto)}
-        ${!p.detalle && !p.novedad && !p.foto ? '<p>Sin más detalles.</p>' : ''}
+        ${!p.novedad && !p.foto && !(p.medio === 'Otros' && p.medioOtro) ? '<p>Sin más detalles.</p>' : ''}
       </div>
     </details>`;
 }
 
-function tarjetaAux(a) {
-  const ok = a.cierre && a.cierre.diferencia === 0;
-  const color = !a.cierre ? 'var(--pend)' : ok ? 'var(--ok)' : 'var(--dev)';
+function tarjetaAux(a, abierto) {
+  const col = !a.cierre ? 'var(--pend)' : a.cierre.diferencia === 0 ? 'var(--ok)' : 'var(--dev)';
   return `
-    <details class="aux">
+    <details class="aux" data-n="${esc(a.nombre)}"${abierto ? ' open' : ''}>
       <summary>
         <span class="display text-lg">${esc(a.nombre)}</span>
         <b style="margin-left:auto">${cop(a.total)}</b>
-        <span class="caja" style="color:${color}">${cajaTxt(a.cierre)}</span>
+        <span class="caja" style="color:${col}">${cajaTxt(a.cierre)}</span>
       </summary>
       <div class="cuerpo">
-        <div style="padding-top:.6rem">${filasMedios(a.totales)}</div>
+        ${filasMedios(a.totales)}
         <p class="nota">${conteoTxt(a.conteo)}</p>
         ${a.cierre ? `<p class="nota">Efectivo contado: ${cop(a.cierre.contado)}${a.cierre.obs ? `. Observaciones: ${esc(a.cierre.obs)}` : ''}</p>` : ''}
         <div class="mt-2">${a.pedidos.map(filaPedido).join('') || '<p class="nota">Sin pedidos en esta fecha.</p>'}</div>
@@ -404,7 +626,8 @@ function tarjetaAux(a) {
 
 async function cargarAdmin() {
   const cont = $('#tab-admin');
-  cont.innerHTML = '<p class="vacio">Cargando…</p>';
+  const abiertos = [...cont.querySelectorAll('details.aux[open]')].map(d => d.dataset.n); // conserva las tarjetas abiertas
+  if (!cont.querySelector('.slip')) cont.innerHTML = '<p class="vacio">Cargando…</p>';
   try {
     const r = await api('admin');
     cont.innerHTML = `
@@ -413,19 +636,44 @@ async function cargarAdmin() {
         <p class="total">${cop(r.total)}</p>
         <p class="nota" style="margin-bottom:.6rem">${conteoTxt(r.conteo)}</p>
         ${filasMedios(r.totales)}
-        <p class="nota">Cajas cerradas: ${r.cierres} de ${r.auxiliares.length} auxiliares</p>
+        <div class="corte">
+          ${bloqueCargue(r.cargue)}
+          <p class="nota">Cajas cerradas: ${r.cierres} de ${r.auxiliares.length} auxiliares</p>
+        </div>
       </div>
-      ${r.auxiliares.map(tarjetaAux).join('') || '<p class="vacio">No hay auxiliares activos.</p>'}
+      ${r.auxiliares.map(a => tarjetaAux(a, abiertos.includes(a.nombre))).join('') || '<p class="vacio">No hay auxiliares activos.</p>'}
       <button id="btnRefrescar" class="btn mt-2" style="background:#fff;color:var(--tinta);border:2px solid var(--tinta)">Actualizar resumen</button>`;
     $('#btnRefrescar').onclick = cargarAdmin;
-  } catch (e) { cont.innerHTML = ''; error(e.message); }
+  } catch (err) { cont.innerHTML = ''; error(err.message); }
 }
+
+$('#tab-admin').onclick = e => {
+  const b = e.target.closest('[data-cargue]');
+  if (!b) return;
+  const caja = b.closest('.cargue');
+  conCarga(b, async () => {
+    const v = caja.querySelector('.cv').value, n = caja.querySelector('.cc').value;
+    if (v === '' || n === '') throw new Error('Escribe el total del cargue y la cantidad de pedidos');
+    await api('cargue', { valor: Number(v), pedidos: Number(n) });
+    await cargarAdmin();
+  });
+};
 
 /* ====== ARRANQUE ====== */
 pintarOpciones();
 cargarUsuarios();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+window.addEventListener('online', () => { if (!S.aux) cargarUsuarios(); pintarBarra(); sincronizar(); });
+window.addEventListener('offline', pintarBarra);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !S.aux) return;
+  if (!S.manual && S.fecha !== hoy()) { S.fecha = hoy(); $('#fecha').value = S.fecha; irA(S.tab); } // la app puede quedar abierta de un día a otro
+  sincronizar();
+});
+setInterval(sincronizar, 30000);
 try {
-  const ses = JSON.parse(sessionStorage.getItem('sesion') || 'null');
+  const ses = JSON.parse(localStorage.getItem('sesion') || 'null');
   if (ses) { S.aux = ses.aux; S.pin = ses.pin; S.rol = ses.rol; entrar(); }
 } catch {}
 </script>
