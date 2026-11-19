@@ -1,5 +1,5 @@
 /* Service worker: deja la app abrir sin conexión. La API de Apps Script nunca se guarda en caché. */
-const V = 'entregas-v1'; // súbelo (v2, v3...) si quieres forzar que todos los celulares descarguen una versión nueva
+const V = 'entregas-v2'; // súbelo (v2, v3...) si quieres forzar que todos los celulares descarguen una versión nueva
 const NUCLEO = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 const EXTERNOS = [
   'https://cdn.tailwindcss.com/3.4.17',

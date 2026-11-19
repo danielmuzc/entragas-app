@@ -119,12 +119,17 @@
     <div id="tab-hoy" class="hidden"></div>
     <div id="tab-cierre" class="hidden"></div>
     <div id="tab-admin" class="hidden"></div>
+    <div id="tab-flete" class="hidden"></div>
   </main>
 
   <nav id="nav" class="fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-md border-t bg-white" style="border-color:var(--linea);padding-bottom:env(safe-area-inset-bottom,0px)">
     <button data-tab="registrar" class="tabbtn flex-1 py-3.5 text-sm font-bold">Registrar</button>
     <button data-tab="hoy" class="tabbtn flex-1 py-3.5 text-sm font-bold">Pedidos</button>
     <button data-tab="cierre" class="tabbtn flex-1 py-3.5 text-sm font-bold">Cierre</button>
+  </nav>
+  <nav id="navAdmin" class="fixed inset-x-0 bottom-0 z-20 mx-auto flex hidden max-w-md border-t bg-white" style="border-color:var(--linea);padding-bottom:env(safe-area-inset-bottom,0px)">
+    <button data-tab="admin" class="tabbtn flex-1 py-3.5 text-sm font-bold">Resumen</button>
+    <button data-tab="flete" class="tabbtn flex-1 py-3.5 text-sm font-bold">Flete</button>
   </nav>
 </section>
 
@@ -140,7 +145,7 @@ const MEDIOS = {
   Otros:           { t: 'Otros',             c: '#46606b', bg: '#e3eaee' }
 };
 const ESTADOS = ['Entregado', 'Pendiente', 'Devuelto'];
-const TABS = ['registrar', 'hoy', 'cierre', 'admin'];
+const TABS = ['registrar', 'hoy', 'cierre', 'admin', 'flete'];
 
 const $ = s => document.querySelector(s);
 const cop = n => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0);
@@ -348,6 +353,7 @@ function entrar() {
   $('#hAux').textContent = admin ? 'Administrador' : S.aux;
   $('#fecha').value = S.fecha;
   $('#nav').classList.toggle('hidden', admin);
+  $('#navAdmin').classList.toggle('hidden', !admin);
   irA(admin ? 'admin' : 'registrar');
   if (!admin) { pintarBarra(); sincronizar(); }
 }
@@ -367,7 +373,7 @@ $('#btnSalir').onclick = async () => {
   if (n && !confirm(`Tienes ${n} sin enviar. Se enviarán cuando vuelvas a entrar con señal. Antes de salir, envía el respaldo por WhatsApp. ¿Salir de todas formas?`)) return;
   try { localStorage.removeItem('sesion'); } catch {}
   S.aux = S.pin = S.rol = null;
-  ['hoy', 'cierre', 'admin'].forEach(t => $('#tab-' + t).innerHTML = '');
+  ['hoy', 'cierre', 'admin', 'flete'].forEach(t => $('#tab-' + t).innerHTML = '');
   $('#barra').classList.add('hidden');
   $('#vApp').classList.add('hidden');
   $('#vLogin').classList.remove('hidden');
@@ -387,6 +393,7 @@ function irA(tab) {
   if (tab === 'hoy') cargarPedidos();
   if (tab === 'cierre') cargarCierre();
   if (tab === 'admin') cargarAdmin();
+  if (tab === 'flete') cargarFlete();
 }
 document.querySelectorAll('.tabbtn').forEach(b => b.onclick = () => irA(b.dataset.tab));
 
@@ -582,6 +589,8 @@ function bloqueCargue(c) {
       <div class="mt-2 grid grid-cols-2 gap-2">
         <label>Total del cargue<input class="inp cv" type="number" inputmode="numeric" min="0" placeholder="0" value="${c ? c.valor : ''}"></label>
         <label>Cantidad de pedidos<input class="inp cc" type="number" inputmode="numeric" min="0" placeholder="0" value="${c ? c.pedidos : ''}"></label>
+        <label>Cargue sin IVA (total menos IVA)<input class="inp cs" type="number" inputmode="numeric" min="0" placeholder="0" value="${c && c.sinIva ? c.sinIva : ''}"></label>
+        <label>% de ganancia<input class="inp cp" type="number" inputmode="decimal" min="0" max="100" step="any" placeholder="0" value="${c && c.porcentaje ? c.porcentaje : ''}"></label>
       </div>
       <button class="btn sm" data-cargue="1">${c ? 'Actualizar cargue' : 'Guardar cargue'}</button>
     </div>`;
@@ -653,9 +662,73 @@ $('#tab-admin').onclick = e => {
   const caja = b.closest('.cargue');
   conCarga(b, async () => {
     const v = caja.querySelector('.cv').value, n = caja.querySelector('.cc').value;
+    const s = caja.querySelector('.cs').value, p = caja.querySelector('.cp').value;
     if (v === '' || n === '') throw new Error('Escribe el total del cargue y la cantidad de pedidos');
-    await api('cargue', { valor: Number(v), pedidos: Number(n) });
+    if (s !== '' && Number(s) > Number(v)) throw new Error('El cargue sin IVA no puede ser mayor al total del cargue');
+    if (p !== '' && (Number(p) < 0 || Number(p) > 100)) throw new Error('El porcentaje debe estar entre 0 y 100');
+    await api('cargue', { valor: Number(v), pedidos: Number(n), sin_iva: s === '' ? null : Number(s), porcentaje: p === '' ? null : Number(p) });
     await cargarAdmin();
+  });
+};
+
+/* ====== FLETE (administrador): ganancia sobre el cargue sin IVA, menos gastos ====== */
+const CATEGORIAS = ['Gasolina', 'Alimentos', 'Peajes', 'Mantenimiento', 'Otros'];
+
+async function cargarFlete() {
+  const cont = $('#tab-flete');
+  if (!cont.querySelector('.slip')) cont.innerHTML = '<p class="vacio">Cargando…</p>';
+  try {
+    const f = await api('flete');
+    const col = f.neto >= 0 ? 'var(--ok)' : 'var(--dev)';
+    const lin = (t, v, c) => `<div class="fila"><span>${t}</span><u></u><b${c ? ` style="color:${c}"` : ''}>${v}</b></div>`;
+    cont.innerHTML = `
+      <div class="slip">
+        <h2>Flete del día</h2>
+        <p class="total" style="color:${col}">${cop(f.neto)}</p>
+        <p class="nota" style="margin-bottom:.6rem">Lo que queda del flete después de gastos</p>
+        ${lin('Total del cargue', cop(f.valor))}
+        ${lin('IVA (total menos sin IVA)', cop(f.iva))}
+        ${lin('Cargue sin IVA', cop(f.sinIva))}
+        ${lin(`Flete bruto (${f.porcentaje}% del cargue sin IVA)`, cop(f.bruto))}
+        ${lin('Gastos', '- ' + cop(f.totalGastos), 'var(--dev)')}
+        ${lin('Flete neto', cop(f.neto), col)}
+        ${f.definido ? '' : '<p class="nota" style="color:var(--pend);font-weight:700">Falta el cargue sin IVA o el porcentaje de ganancia. Defínelos en Resumen.</p><button class="btn sm" data-ir="admin">Ir a Resumen</button>'}
+      </div>
+      <div class="panel">
+        <h2 class="display text-lg">Gastos del día</h2>
+        <div class="mt-2 grid grid-cols-2 gap-2" style="align-items:end">
+          <label class="lbl" style="margin:0">Categoría<select id="gCat" class="inp">${CATEGORIAS.map(c => `<option>${c}</option>`).join('')}</select></label>
+          <label class="lbl" style="margin:0">Valor<input id="gVal" class="inp" type="number" inputmode="numeric" min="0" placeholder="0"></label>
+        </div>
+        <label class="lbl" for="gDesc">Descripción (obligatoria en Otros)</label>
+        <input id="gDesc" class="inp" autocomplete="off" placeholder="Ej: tanqueo camión">
+        <button class="btn sm" data-gasto="1">Agregar gasto</button>
+        <div class="mt-3">
+          ${f.gastos.map(g => `
+            <div class="fila" style="padding:.55rem 0;border-top:1px solid var(--fondo)">
+              <span><b>${esc(g.categoria)}</b>${g.descripcion ? ', ' + esc(g.descripcion) : ''}</span><u></u><b>${cop(g.valor)}</b>
+              <button data-anular="${esc(g.id)}" class="text-sm underline" style="margin-left:.6rem;color:var(--dev)">Anular</button>
+            </div>`).join('') || '<p class="nota">Aún no hay gastos en esta fecha.</p>'}
+        </div>
+      </div>`;
+  } catch (err) { cont.innerHTML = ''; error(err.message); }
+}
+
+$('#tab-flete').onclick = e => {
+  const ir = e.target.closest('[data-ir]');
+  if (ir) { irA(ir.dataset.ir); return; }
+  const a = e.target.closest('[data-anular]');
+  if (a) {
+    if (confirm('¿Anular este gasto?')) conCarga(a, async () => { await api('gasto_anular', { id: a.dataset.anular }); await cargarFlete(); });
+    return;
+  }
+  const b = e.target.closest('[data-gasto]');
+  if (b) conCarga(b, async () => {
+    const valor = $('#gVal').value, cat = $('#gCat').value, desc = $('#gDesc').value.trim();
+    if (valor === '' || Number(valor) <= 0) throw new Error('Escribe el valor del gasto');
+    if (cat === 'Otros' && !desc) throw new Error('Describe el gasto');
+    await api('gasto', { categoria: cat, descripcion: desc, valor: Number(valor) });
+    await cargarFlete();
   });
 };
 
